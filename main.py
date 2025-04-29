@@ -5,6 +5,8 @@ import json
 
 from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from typing import Optional
 
 #API instance
 app = FastAPI()
@@ -1206,6 +1208,63 @@ def Get_event_by_Event_Organisers():
   
     return {"Events ":events_dict_list}
 
+
+
+
+
+
+@app.get("/booked_dates_event_planner", status_code=200)
+def get_booked_dates_event_planner(profile_id: Optional[int] = None):
+    conn = sqlite3.connect('event_management.db', timeout=10)
+    cursor = conn.cursor()
+
+    try:
+
+        sql_query = """
+            SELECT e.start_date, e.end_date
+            FROM Events e
+            JOIN Profile p ON e.profile_id = p.profile_id
+            JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
+            WHERE pt.profile_type = 'event organizer'
+              AND e.payment_status = 'Payment Transferred'
+        """
+        params = ()
+
+        # If profile_id is provided (optional)
+        if profile_id:
+            sql_query += " AND e.profile_id = ?"
+            params = (profile_id,)
+
+        cursor.execute(sql_query, params)
+        results = cursor.fetchall()
+
+        booked_dates = set()
+
+        # Expand each event by  start_date to end_date
+        for start_str, end_str in results:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+
+            current_date = start_date
+            while current_date <= end_date:
+                booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                current_date += timedelta(days=1)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        conn.close()
+
+    return {"disabled_dates": sorted(list(booked_dates))}
+
+
+
+
+
+
+
+
 # Endpoint to submit a new bid
 @app.post("/submit_bid/")
 async def submit_bid(bid: BidRequest):
@@ -1219,7 +1278,6 @@ async def submit_bid(bid: BidRequest):
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Check if the event exists
     cursor.execute('SELECT * FROM Event_Organisers WHERE organiser_event_id = ?', (bid.event_id,))
     event = cursor.fetchone()
     
