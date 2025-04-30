@@ -952,7 +952,6 @@ async def Booked_Events(user_id: int):
         "profiles": []
     }
 
-    # Step 2: Retrieve profiles for the given user_id
     profile_query = '''
     SELECT profile_id, company_name, contact_detail, experience, thumbnail_image
     FROM Profile
@@ -962,14 +961,13 @@ async def Booked_Events(user_id: int):
     profiles = cursor.fetchall()
 
     if profiles:
-        # Step 3: For each profile, retrieve events associated with the profile_id
         for profile in profiles:
             profile_data = {
-                "profile_id": profile[0],         # index 0 corresponds to profile_id
-                "company_name": profile[1],       # index 1 corresponds to company_name
-                "contact_detail": profile[2],     # index 2 corresponds to contact_detail
-                "experience": profile[3],         # index 3 corresponds to experience
-                "thumbnail_image": profile[4],    # index 4 corresponds to thumbnail_image
+                "profile_id": profile[0],        
+                "company_name": profile[1],       
+                "contact_detail": profile[2],     
+                "experience": profile[3],         
+                "thumbnail_image": profile[4],    
                 "events": []
             }
 
@@ -979,23 +977,23 @@ async def Booked_Events(user_id: int):
             FROM Events
             WHERE profile_id = ?
             '''
-            cursor.execute(events_query, (profile[0],))  # profile[0] is the profile_id
+            cursor.execute(events_query, (profile[0],))  
             events = cursor.fetchall()
 
             # For each event, fetch user details from the Users table
             for event in events:
                 event_data = {
-                    "event_id": event[0],             # index 0 corresponds to event_id
-                    "event_name": event[1],           # index 1 corresponds to event_name
-                    "number_of_guests": event[2],     # index 2 corresponds to number_of_guests
-                    "start_date": event[3],           # index 3 corresponds to start_date
-                    "end_date": event[4],             # index 4 corresponds to end_date
-                    "location": event[5],             # index 5 corresponds to location
-                    "payment_status": event[6]        # index 6 corresponds to payment_status
+                    "event_id": event[0],             
+                    "event_name": event[1],           
+                    "number_of_guests": event[2],    
+                    "start_date": event[3],           
+                    "end_date": event[4],             
+                    "location": event[5],             
+                    "payment_status": event[6]        
                 }
 
                 # Fetch user details for the user_id from the event
-                user_id_from_event = event[7]  # index 7 corresponds to user_id from the event
+                user_id_from_event = event[7]  
                 user_query_for_event = '''
                 SELECT first_name, last_name, business_name, email, location, contact
                 FROM Users
@@ -1006,8 +1004,8 @@ async def Booked_Events(user_id: int):
 
                 if user_from_event:
                     event_data["user_info_who_booked_event"] = {
-                        "first_name": user_from_event[0],  # index 0 corresponds to first_name
-                        "last_name": user_from_event[1],   # index 1 corresponds to last_name
+                        "first_name": user_from_event[0], 
+                        "last_name": user_from_event[1], 
                         "business_name": user_from_event[2],
                         "email": user_from_event[3],
                         "location": user_from_event[4],
@@ -1078,25 +1076,21 @@ def create_payment(payment: Payments):
     conn = sqlite3.connect('event_management.db', timeout=10)
     cursor = conn.cursor()
 
-    # Insert new payment
     cursor.execute("""
         INSERT INTO Payments (payment_amount, payment_type, event_id, package_id, user_id)
         VALUES (?, ?, ?, ?, ?)
     """, (payment.payment_amount, payment.payment_type, payment.event_id, payment.package_id, payment.user_id))
 
-    # Commit the transaction
     conn.commit()
 
-    # Retrieve the last inserted payment record
     new_payment_id = cursor.lastrowid
     cursor.execute("SELECT * FROM Payments WHERE payment_id = ?", (new_payment_id,))
     result = cursor.fetchone()
 
-    # Map the result to a dictionary
     keys = ['payment_id', 'payment_amount', 'payment_type', 'payment_status', 'event_id', 'package_id', 'user_id']
     payment_data = dict(zip(keys, result))
 
-    # Update the `payment_status` of the corresponding event to "Payment Transferred"
+
     cursor.execute("""
         UPDATE Events
         SET payment_status = 'Payment Transferred'
@@ -1156,10 +1150,9 @@ def create_event(event: EventCreateRequest, user_id: int):
     if not result or result[0] != 5:
         conn.close()
         raise HTTPException(status_code=403, detail="Permission denied: User is not an event organizer")
-    # Convert service_type list to a comma-separated string to store in the database
+
     service_type_str = ','.join(event.service_type)
 
-    # Insert the new event into the Event_Organisers table
     cursor.execute('''
         INSERT INTO Event_Organisers (
             event_type, event_name, event_location, event_description, event_date, 
@@ -1168,13 +1161,13 @@ def create_event(event: EventCreateRequest, user_id: int):
     ''', (event.event_type, event.event_name, event.event_location, event.event_description, 
           event.event_date, event.application_deadline, service_type_str, user_id))
 
-    # Commit the transaction and retrieve the new event's ID
     conn.commit()
     new_event_id = cursor.lastrowid
     conn.close()
-
-    # Return a success message with the generated event ID
     return {"message": "Event created successfully", "event_id": new_event_id}
+
+
+
 
 # Get Event List
 @app.get("/get_event_by_Event_Organisers")
