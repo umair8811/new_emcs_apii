@@ -856,6 +856,39 @@ def get_Package_images():
 
 
 
+
+# @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
+# def Create_Book_Event(event: Events):
+#     conn = sqlite3.connect('event_management.db', timeout=10)
+#     cursor = conn.cursor()
+
+#     # Insert the new event
+#     cursor.execute(
+#         """
+#         INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
+#         VALUES (?, ?, ?, ?, ?, ?,?,?)
+#         """,
+#         (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
+#     )
+
+#     # Get the last inserted event ID
+#     event_id = cursor.lastrowid
+
+#     # Fetch only the newly created event
+#     cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
+#     row = cursor.fetchone()
+
+#     # Map the fetched row to a dictionary format
+#     keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
+#     created_event = dict(zip(keys, row))
+
+#     conn.commit()
+#     conn.close()
+
+#     return {"Event": created_event}
+
+
+
 @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
 def create_book_event(event: Events):
     try:
@@ -942,36 +975,6 @@ def get_booked_dates(profile_id: Optional[int] = None):
         if conn:
             conn.close()
 
-
-# @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
-# def Create_Book_Event(event: Events):
-#     conn = sqlite3.connect('event_management.db', timeout=10)
-#     cursor = conn.cursor()
-
-#     # Insert the new event
-#     cursor.execute(
-#         """
-#         INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
-#         VALUES (?, ?, ?, ?, ?, ?,?,?)
-#         """,
-#         (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
-#     )
-
-#     # Get the last inserted event ID
-#     event_id = cursor.lastrowid
-
-#     # Fetch only the newly created event
-#     cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
-#     row = cursor.fetchone()
-
-#     # Map the fetched row to a dictionary format
-#     keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
-#     created_event = dict(zip(keys, row))
-
-#     conn.commit()
-#     conn.close()
-
-#     return {"Event": created_event}
 
 
 #Get Book Event
@@ -1292,26 +1295,21 @@ def Get_event_by_Event_Organisers():
 
 
 
-# @app.get("/booked_dates_event_planner", status_code=200)
-# def get_booked_dates_event_planner(profile_id: Optional[int] = None):
+# @app.get("/booked_dates", status_code=200)
+# def get_booked_dates(profile_id: Optional[int] = None):
 #     conn = sqlite3.connect('event_management.db', timeout=10)
 #     cursor = conn.cursor()
 
 #     try:
-
 #         sql_query = """
-#             SELECT e.start_date, e.end_date
-#             FROM Events e
-#             JOIN Profile p ON e.profile_id = p.profile_id
-#             JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
-#             WHERE pt.profile_type = 'event organizer'
-#               AND e.payment_status = 'Payment Transferred'
+#             SELECT start_date, end_date
+#             FROM Events
+#             WHERE booking_status = 'confirmed'
 #         """
 #         params = ()
 
-#         # If profile_id is provided (optional)
 #         if profile_id:
-#             sql_query += " AND e.profile_id = ?"
+#             sql_query += " AND profile_id = ?"
 #             params = (profile_id,)
 
 #         cursor.execute(sql_query, params)
@@ -1319,7 +1317,6 @@ def Get_event_by_Event_Organisers():
 
 #         booked_dates = set()
 
-#         # Expand each event by  start_date to end_date
 #         for start_str, end_str in results:
 #             start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
 #             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
@@ -1329,13 +1326,62 @@ def Get_event_by_Event_Organisers():
 #                 booked_dates.add(current_date.strftime("%Y-%m-%d"))
 #                 current_date += timedelta(days=1)
 
+#         return {"disabled_dates": sorted(list(booked_dates))}
+
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
 #     finally:
 #         conn.close()
 
-#     return {"disabled_dates": sorted(list(booked_dates))}
+
+
+
+
+@app.get("/booked_dates_event_planner", status_code=200)
+def get_booked_dates_event_planner(profile_id: Optional[int] = None):
+    conn = sqlite3.connect('event_management.db', timeout=10)
+    cursor = conn.cursor()
+
+    try:
+
+        sql_query = """
+            SELECT e.start_date, e.end_date
+            FROM Events e
+            JOIN Profile p ON e.profile_id = p.profile_id
+            JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
+            WHERE pt.profile_type = 'event organizer'
+              AND e.payment_status = 'Payment Transferred'
+        """
+        params = ()
+
+        # If profile_id is provided (optional)
+        if profile_id:
+            sql_query += " AND e.profile_id = ?"
+            params = (profile_id,)
+
+        cursor.execute(sql_query, params)
+        results = cursor.fetchall()
+
+        booked_dates = set()
+
+        # Expand each event by  start_date to end_date
+        for start_str, end_str in results:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+
+            current_date = start_date
+            while current_date <= end_date:
+                booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                current_date += timedelta(days=1)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        conn.close()
+
+    return {"disabled_dates": sorted(list(booked_dates))}
 
 
 
