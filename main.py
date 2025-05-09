@@ -1206,6 +1206,110 @@ def Get_event_by_Event_Organisers():
 
 
 
+# @app.get("/booked_dates", status_code=200)
+# def get_booked_dates(profile_id: Optional[int] = None):
+#     conn = sqlite3.connect('event_management.db', timeout=10)
+#     cursor = conn.cursor()
+
+#     try:
+#         sql_query = """
+#             SELECT start_date, end_date
+#             FROM Events
+#             WHERE booking_status = 'confirmed'
+#         """
+#         params = ()
+
+#         if profile_id:
+#             sql_query += " AND profile_id = ?"
+#             params = (profile_id,)
+
+#         cursor.execute(sql_query, params)
+#         results = cursor.fetchall()
+
+#         booked_dates = set()
+
+#         for start_str, end_str in results:
+#             start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+#             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+
+#             current_date = start_date
+#             while current_date <= end_date:
+#                 booked_dates.add(current_date.strftime("%Y-%m-%d"))
+#                 current_date += timedelta(days=1)
+
+#         return {"disabled_dates": sorted(list(booked_dates))}
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+#     finally:
+#         conn.close()
+
+
+
+from fastapi import APIRouter, HTTPException
+from typing import Optional
+import sqlite3
+from datetime import datetime, timedelta
+
+router = APIRouter()
+
+@router.get("/booked_dates", status_code=200)
+def get_booked_dates(profile_id: Optional[int] = None):
+    try:
+        # Connect to the database
+        conn = sqlite3.connect('event_management.db', timeout=10)
+        cursor = conn.cursor()
+
+        # Construct SQL query
+        sql_query = """
+            SELECT start_date, end_date
+            FROM Events
+            WHERE booking_status = 'confirmed'
+        """
+        params = ()
+
+        if profile_id:
+            sql_query += " AND profile_id = ?"
+            params = (profile_id,)
+
+        # Execute query
+        cursor.execute(sql_query, params)
+        results = cursor.fetchall()
+
+        booked_dates = set()
+
+        # Process date ranges
+        for start_str, end_str in results:
+            try:
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+
+                current_date = start_date
+                while current_date <= end_date:
+                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                    current_date += timedelta(days=1)
+            except ValueError as ve:
+                # Log date parsing errors but continue processing other dates
+                print(f"Date parsing error for start_date={start_str}, end_date={end_str}: {ve}")
+                continue
+
+        # Return sorted list of booked dates
+        return {"disabled_dates": sorted(list(booked_dates))}
+
+    except sqlite3.Error as db_error:
+        # Handle database-specific errors
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as e:
+        # Handle any other unexpected errors
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    finally:
+        # Ensure the connection is closed
+        if 'conn' in locals():
+            conn.close()
+
+
+
 @app.get("/booked_dates_event_planner", status_code=200)
 def get_booked_dates_event_planner(profile_id: Optional[int] = None):
     conn = sqlite3.connect('event_management.db', timeout=10)
