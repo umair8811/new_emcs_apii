@@ -1209,43 +1209,59 @@ def Get_event_by_Event_Organisers():
 
 
 @app.get("/booked_dates_event_planner", status_code=200)
-def get_booked_dates_event_planner(profile_id: Optional[int] = None):
-    if not profile_id:
-        raise HTTPException(status_code=400, detail="profile_id is required")
-
+def get_booked_dates_event_planner(
+    profile_id: Optional[int] = None,
+    profile_type: Optional[str] = 'event organizer'
+):
     conn = sqlite3.connect('event_management.db', timeout=10)
     cursor = conn.cursor()
 
     try:
-        # Get only events for the provided profile_id with pending payment
+        # Base SQL with JOIN to filter by profile type
         sql_query = """
-            SELECT e.start_date, e.end_date, p.profile_type_id
+            SELECT e.start_date, e.end_date
             FROM Events e
             JOIN Profile p ON e.profile_id = p.profile_id
-            WHERE e.profile_id = ?
-            AND e.payment_status = 'Pending'
+            JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
+            WHERE pt.profile_type = ?
         """
-        cursor.execute(sql_query, (profile_id,))
+        params = [profile_type]  # Always include profile_type parameter
+
+        if profile_id:
+            sql_query += " AND e.profile_id = ?"
+            params.append(profile_id)
+
+        logger.info(f"Executing query: {sql_query} with params: {params}")
+        cursor.execute(sql_query, params)
         results = cursor.fetchall()
+        logger.info(f"Query results: {results}")
 
         booked_dates = set()
-        for start_str, end_str in results:
-            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
 
-            current_date = start_date
-            while current_date <= end_date:
-                booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                current_date += timedelta(days=1)
+        # Expand each event from start_date to end_date
+        for start_str, end_str in results:
+            try:
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+                logger.info(f"Processing event from {start_str} to {end_str}")
+
+                current_date = start_date
+                while current_date <= end_date:
+                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                    current_date += timedelta(days=1)
+            except ValueError as ve:
+                logger.error(f"Invalid date format for {start_str} or {end_str}: {ve}")
+                continue
+
+        logger.info(f"Booked dates: {booked_dates}")
+        return {"disabled_dates": sorted(list(booked_dates))}
 
     except Exception as e:
+        logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         conn.close()
-
-    return {"disabled_dates": sorted(list(booked_dates))}
-
 
 
 
