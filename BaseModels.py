@@ -69,15 +69,16 @@ class Package_images(BaseModel):
     image_desc: str 
 
 class Events(BaseModel):
-    event_name: str
-    number_of_guests: int
-    package_id: int
-    start_date: date
-    end_date: date
-    user_id: int
-    profile_id: int
-    location: str
-    booking_status: str
+  #  event_id:int 
+    event_name:str
+    number_of_guests:int  
+    package_id:int 
+    start_date:date
+    end_date:date
+    # payment_status:str 
+    user_id: int 
+    profile_id: int 
+    location: str 
 
 class Payments(BaseModel):
  #   payment_id:int 
