@@ -1156,7 +1156,7 @@ def create_event(event: EventCreateRequest, user_id: int):
     if not result or result[0] != 5:
         conn.close()
         raise HTTPException(status_code=403, detail="Permission denied: User is not an event organizer")
-    # Convert service_type list to a comma-separated string to store in the database
+
     service_type_str = ','.join(event.service_type)
 
     # Insert the new event into the Event_Organisers table
@@ -1168,13 +1168,13 @@ def create_event(event: EventCreateRequest, user_id: int):
     ''', (event.event_type, event.event_name, event.event_location, event.event_description, 
           event.event_date, event.application_deadline, service_type_str, user_id))
 
-    # Commit the transaction and retrieve the new event's ID
     conn.commit()
     new_event_id = cursor.lastrowid
     conn.close()
 
-    # Return a success message with the generated event ID
     return {"message": "Event created successfully", "event_id": new_event_id}
+
+
 
 # Get Event List
 @app.get("/get_event_by_Event_Organisers")
@@ -1194,7 +1194,6 @@ def Get_event_by_Event_Organisers():
             profile_dict_list = [dict(zip(keys, item)) for item in res]
         except Exception as e:
             error_list.append(f"An error occurred: {str(e)}")
-        #raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
         finally:
             conn.commit()
             conn.close()
@@ -1202,7 +1201,6 @@ def Get_event_by_Event_Organisers():
     future = executor.submit(fetch_Event_Organisers_data)
     events_dict_list = future.result()
 
-    # Check if there were any errors
     if error_list:
         return {"errors": error_list}
   
@@ -1210,6 +1208,16 @@ def Get_event_by_Event_Organisers():
 
 
 
+from fastapi import FastAPI, HTTPException
+from typing import Optional
+from datetime import datetime, timedelta
+import sqlite3
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI()
 
 @app.get("/booked_dates_event_planner", status_code=200)
 def get_booked_dates_event_planner(profile_id: Optional[int] = None):
@@ -1217,45 +1225,53 @@ def get_booked_dates_event_planner(profile_id: Optional[int] = None):
     cursor = conn.cursor()
 
     try:
-        # Base SQL with JOIN to make sure profile is an event organizer
         sql_query = """
             SELECT e.start_date, e.end_date
             FROM Events e
             JOIN Profile p ON e.profile_id = p.profile_id
             JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
             WHERE pt.profile_type = 'event organizer'
-              AND e.payment_status = 'Payment Transferred'
         """
 
         params = ()
-
-        # If profile_id is provided (optional), filter more
         if profile_id:
             sql_query += " AND e.profile_id = ?"
             params = (profile_id,)
 
+        logger.info(f"Executing query: {sql_query} with params: {params}")
         cursor.execute(sql_query, params)
         results = cursor.fetchall()
+        logger.info(f"Query results: {results}")
 
         booked_dates = set()
 
-        # Expand each event from start_date to end_date
         for start_str, end_str in results:
-            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+            try:
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+                logger.info(f"Processing event from {start_str} to {end_str}")
 
-            current_date = start_date
-            while current_date <= end_date:
-                booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                current_date += timedelta(days=1)
+                current_date = start_date
+                while current_date <= end_date:
+                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                    current_date += timedelta(days=1)
+            except ValueError as ve:
+                logger.error(f"Invalid date format for {start_str} or {end_str}: {ve}")
+                continue
+
+        logger.info(f"Booked dates: {booked_dates}")
+        return {"disabled_dates": sorted(list(booked_dates))}
 
     except Exception as e:
+        logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         conn.close()
 
-    return {"disabled_dates": sorted(list(booked_dates))}
+
+
+
 
 
 
