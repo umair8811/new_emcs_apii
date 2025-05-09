@@ -1209,59 +1209,53 @@ def Get_event_by_Event_Organisers():
 
 
 @app.get("/booked_dates_event_planner", status_code=200)
-def get_booked_dates_event_planner(
-    profile_id: Optional[int] = None,
-    profile_type: Optional[str] = 'event organizer'
-):
+def get_booked_dates_event_planner(profile_type: Optional[str] = None, profile_id: Optional[int] = None):
     conn = sqlite3.connect('event_management.db', timeout=10)
     cursor = conn.cursor()
 
     try:
-        # Base SQL with JOIN to filter by profile type
+        # Start the query without the profile_type condition
         sql_query = """
             SELECT e.start_date, e.end_date
             FROM Events e
             JOIN Profile p ON e.profile_id = p.profile_id
             JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
-            WHERE pt.profile_type = ?
+            WHERE e.payment_status = 'Pending'
         """
-        params = [profile_type]  # Always include profile_type parameter
+        params = []
+
+        if profile_type:
+            # Add the profile_type condition if provided
+            sql_query += " AND pt.profile_type = ?"
+            params.append(profile_type)
 
         if profile_id:
+            # Add the profile_id condition if provided
             sql_query += " AND e.profile_id = ?"
             params.append(profile_id)
 
-        logger.info(f"Executing query: {sql_query} with params: {params}")
-        cursor.execute(sql_query, params)
+        cursor.execute(sql_query, tuple(params))  # Use tuple for parameters
         results = cursor.fetchall()
-        logger.info(f"Query results: {results}")
 
         booked_dates = set()
 
         # Expand each event from start_date to end_date
         for start_str, end_str in results:
-            try:
-                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-                logger.info(f"Processing event from {start_str} to {end_str}")
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
 
-                current_date = start_date
-                while current_date <= end_date:
-                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                    current_date += timedelta(days=1)
-            except ValueError as ve:
-                logger.error(f"Invalid date format for {start_str} or {end_str}: {ve}")
-                continue
-
-        logger.info(f"Booked dates: {booked_dates}")
-        return {"disabled_dates": sorted(list(booked_dates))}
-
+            current_date = start_date
+            while current_date <= end_date:
+                booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                current_date += timedelta(days=1)
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         conn.close()
+
+    return {"disabled_dates": sorted(list(booked_dates))}
+
 
 
 
