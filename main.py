@@ -857,124 +857,35 @@ def get_Package_images():
 
 
 
-# @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
-# def Create_Book_Event(event: Events):
-#     conn = sqlite3.connect('event_management.db', timeout=10)
-#     cursor = conn.cursor()
-
-#     # Insert the new event
-#     cursor.execute(
-#         """
-#         INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
-#         VALUES (?, ?, ?, ?, ?, ?,?,?)
-#         """,
-#         (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
-#     )
-
-#     # Get the last inserted event ID
-#     event_id = cursor.lastrowid
-
-#     # Fetch only the newly created event
-#     cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
-#     row = cursor.fetchone()
-
-#     # Map the fetched row to a dictionary format
-#     keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
-#     created_event = dict(zip(keys, row))
-
-#     conn.commit()
-#     conn.close()
-
-#     return {"Event": created_event}
-
-
-
 @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
-def create_book_event(event: Events):
-    try:
-        conn = sqlite3.connect("event_management.db", timeout=10)
-        cursor = conn.cursor()
+def Create_Book_Event(event: Events):
+    conn = sqlite3.connect('event_management.db', timeout=10)
+    cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            INSERT INTO Events (
-                event_name, number_of_guests, package_id,
-                start_date, end_date, user_id,
-                profile_id, location, booking_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                event.event_name,
-                event.number_of_guests,
-                event.package_id,
-                event.start_date.strftime("%Y-%m-%d"),
-                event.end_date.strftime("%Y-%m-%d"),
-                event.user_id,
-                event.profile_id,
-                event.location,
-                event.booking_status.lower()  # Ensure lowercase match
-            ),
-        )
+    # Insert the new event
+    cursor.execute(
+        """
+        INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
+        VALUES (?, ?, ?, ?, ?, ?,?,?)
+        """,
+        (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
+    )
 
-        conn.commit()
-        event_id = cursor.lastrowid
+    # Get the last inserted event ID
+    event_id = cursor.lastrowid
 
-        cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
-        row = cursor.fetchone()
+    # Fetch only the newly created event
+    cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
+    row = cursor.fetchone()
 
-        keys = [
-            "event_id", "event_name", "number_of_guests", "package_id",
-            "start_date", "end_date", "user_id", "profile_id", "location", "booking_status"
-        ]
-        created_event = dict(zip(keys, row))
+    # Map the fetched row to a dictionary format
+    keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
+    created_event = dict(zip(keys, row))
 
-        return {"Event": created_event}
+    conn.commit()
+    conn.close()
 
-    except Exception as e:
-        logger.error(f"Error creating event: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create event.")
-    finally:
-        if conn:
-            conn.close()
-
-
-@app.get("/booked_dates", status_code=200)
-def get_booked_dates(profile_id: Optional[int] = None):
-    try:
-        conn = sqlite3.connect("event_management.db", timeout=10)
-        cursor = conn.cursor()
-
-        query = "SELECT start_date, end_date FROM Events WHERE booking_status = 'confirmed'"
-        params = ()
-        if profile_id is not None:
-            query += " AND profile_id = ?"
-            params = (profile_id,)
-
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-
-        booked_dates = set()
-
-        for start_str, end_str in results:
-            if not start_str or not end_str:
-                continue
-            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-
-            current = start_date
-            while current <= end_date:
-                booked_dates.add(current.strftime("%Y-%m-%d"))
-                current += timedelta(days=1)
-
-        return {"disabled_dates": sorted(list(booked_dates))}
-
-    except Exception as e:
-        logger.error(f"Error fetching booked dates: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch booked dates.")
-    finally:
-        if conn:
-            conn.close()
-
+    return {"Event": created_event}
 
 
 #Get Book Event
@@ -1290,49 +1201,6 @@ def Get_event_by_Event_Organisers():
   
     return {"Events ":events_dict_list}
 
-
-
-
-
-
-# @app.get("/booked_dates", status_code=200)
-# def get_booked_dates(profile_id: Optional[int] = None):
-#     conn = sqlite3.connect('event_management.db', timeout=10)
-#     cursor = conn.cursor()
-
-#     try:
-#         sql_query = """
-#             SELECT start_date, end_date
-#             FROM Events
-#             WHERE booking_status = 'confirmed'
-#         """
-#         params = ()
-
-#         if profile_id:
-#             sql_query += " AND profile_id = ?"
-#             params = (profile_id,)
-
-#         cursor.execute(sql_query, params)
-#         results = cursor.fetchall()
-
-#         booked_dates = set()
-
-#         for start_str, end_str in results:
-#             start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-#             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-
-#             current_date = start_date
-#             while current_date <= end_date:
-#                 booked_dates.add(current_date.strftime("%Y-%m-%d"))
-#                 current_date += timedelta(days=1)
-
-#         return {"disabled_dates": sorted(list(booked_dates))}
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-#     finally:
-#         conn.close()
 
 
 
