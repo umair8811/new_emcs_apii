@@ -859,33 +859,168 @@ def get_Package_images():
 
 @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
 def Create_Book_Event(event: Events):
-    conn = sqlite3.connect('event_management.db', timeout=10)
-    cursor = conn.cursor()
+    """
+    Create a new event in the Events table with booking_status set to 'confirmed'.
+    Returns the created event with all fields.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect('event_management.db', timeout=10)
+        cursor = conn.cursor()
 
-    # Insert the new event
-    cursor.execute(
+        # Insert the new event
+        cursor.execute(
+            """
+            INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date, user_id, profile_id, location, booking_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.event_name,
+                event.number_of_guests,
+                event.package_id,
+                event.start_date.strftime("%Y-%m-%d"),
+                event.end_date.strftime("%Y-%m-%d"),
+                event.user_id,
+                event.profile_id,
+                event.location,
+                event.booking_status
+            )
+        )
+
+        # Get the last inserted event ID
+        event_id = cursor.lastrowid
+
+        # Fetch the newly created event
+        cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
+        row = cursor.fetchone()
+
+        # Map the fetched row to a dictionary
+        keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id', 'profile_id', 'location', 'booking_status']
+        created_event = dict(zip(keys, row))
+
+        conn.commit()
+        logger.info(f"Event created: {created_event}")
+
+        return {"Event": created_event}
+
+    except sqlite3.OperationalError as db_error:
+        logger.error(f"Database operational error: {db_error}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except sqlite3.DatabaseError as db_error:
+        logger.error(f"Database error: {db_error}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+            logger.info("Database connection closed")
+
+
+
+
+@app.get("/booked_dates", status_code=200)
+def get_booked_dates(profile_id: Optional[int] = None):
+    """
+    Fetch booked dates from the Events table where booking_status is 'confirmed'.
+    Optionally filter by profile_id.
+    Returns a sorted list of dates between start_date and end_date in 'YYYY-MM-DD' format.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect('event_management.db', timeout=10)
+        cursor = conn.cursor()
+
+        # Construct SQL query
+        sql_query = """
+            SELECT start_date, end_date
+            FROM Events
+            WHERE booking_status = 'confirmed'
         """
-        INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
-        VALUES (?, ?, ?, ?, ?, ?,?,?)
-        """,
-        (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
-    )
+        params = ()
 
-    # Get the last inserted event ID
-    event_id = cursor.lastrowid
+        if profile_id is not None:
+            sql_query += " AND profile_id = ?"
+            params = (profile_id,)
 
-    # Fetch only the newly created event
-    cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
-    row = cursor.fetchone()
+        # Execute query
+        logger.info(f"Executing query: {sql_query} with params: {params}")
+        cursor.execute(sql_query, params)
+        results = cursor.fetchall()
+        logger.info(f"Query returned {len(results)} rows")
 
-    # Map the fetched row to a dictionary format
-    keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
-    created_event = dict(zip(keys, row))
+        booked_dates = set()
 
-    conn.commit()
-    conn.close()
+        # Process each date range
+        for start_str, end_str in results:
+            try:
+                if not start_str or not end_str:
+                    logger.warning(f"Skipping empty dates: start={start_str}, end={end_str}")
+                    continue
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
 
-    return {"Event": created_event}
+                if start_date > end_date:
+                    logger.warning(f"Invalid date range: start={start_str} > end={end_str}")
+                    continue
+
+                current_date = start_date
+                while current_date <= end_date:
+                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                    current_date += timedelta(days=1)
+            except ValueError as ve:
+                logger.error(f"Date parsing error for start={start_str}, end={end_str}: {ve}")
+                continue
+
+        response = {"disabled_dates": sorted(list(booked_dates))}
+        logger.info(f"Returning {len(response['disabled_dates'])} booked dates")
+        return response
+
+    except sqlite3.OperationalError as db_error:
+        logger.error(f"Database operational error: {db_error}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except sqlite3.DatabaseError as db_error:
+        logger.error(f"Database error: {db_error}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+            logger.info("Database connection closed")
+
+
+# @app.post("/Create_Book_Event", status_code=status.HTTP_201_CREATED)
+# def Create_Book_Event(event: Events):
+#     conn = sqlite3.connect('event_management.db', timeout=10)
+#     cursor = conn.cursor()
+
+#     # Insert the new event
+#     cursor.execute(
+#         """
+#         INSERT INTO Events (event_name, number_of_guests, package_id, start_date, end_date,user_id,profile_id,location)
+#         VALUES (?, ?, ?, ?, ?, ?,?,?)
+#         """,
+#         (event.event_name, event.number_of_guests, event.package_id, event.start_date.strftime("%Y-%m-%d"),event.end_date.strftime("%Y-%m-%d"), event.user_id,event.profile_id,event.location)
+#     )
+
+#     # Get the last inserted event ID
+#     event_id = cursor.lastrowid
+
+#     # Fetch only the newly created event
+#     cursor.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,))
+#     row = cursor.fetchone()
+
+#     # Map the fetched row to a dictionary format
+#     keys = ['event_id', 'event_name', 'number_of_guests', 'package_id', 'start_date', 'end_date', 'user_id','profile_id','location','payment_status']
+#     created_event = dict(zip(keys, row))
+
+#     conn.commit()
+#     conn.close()
+
+#     return {"Event": created_event}
 
 
 #Get Book Event
@@ -1247,113 +1382,52 @@ def Get_event_by_Event_Organisers():
 
 
 
-from fastapi import APIRouter, HTTPException
-from typing import Optional
-import sqlite3
-from datetime import datetime, timedelta
-
-router = APIRouter()
-
-@router.get("/booked_dates", status_code=200)
-def get_booked_dates(profile_id: Optional[int] = None):
-    try:
-        # Connect to the database
-        conn = sqlite3.connect('event_management.db', timeout=10)
-        cursor = conn.cursor()
-
-        # Construct SQL query
-        sql_query = """
-            SELECT start_date, end_date
-            FROM Events
-            WHERE booking_status = 'confirmed'
-        """
-        params = ()
-
-        if profile_id:
-            sql_query += " AND profile_id = ?"
-            params = (profile_id,)
-
-        # Execute query
-        cursor.execute(sql_query, params)
-        results = cursor.fetchall()
-
-        booked_dates = set()
-
-        # Process date ranges
-        for start_str, end_str in results:
-            try:
-                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-
-                current_date = start_date
-                while current_date <= end_date:
-                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                    current_date += timedelta(days=1)
-            except ValueError as ve:
-                # Log date parsing errors but continue processing other dates
-                print(f"Date parsing error for start_date={start_str}, end_date={end_str}: {ve}")
-                continue
-
-        # Return sorted list of booked dates
-        return {"disabled_dates": sorted(list(booked_dates))}
-
-    except sqlite3.Error as db_error:
-        # Handle database-specific errors
-        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
-    except Exception as e:
-        # Handle any other unexpected errors
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
-    finally:
-        # Ensure the connection is closed
-        if 'conn' in locals():
-            conn.close()
 
 
+# @app.get("/booked_dates_event_planner", status_code=200)
+# def get_booked_dates_event_planner(profile_id: Optional[int] = None):
+#     conn = sqlite3.connect('event_management.db', timeout=10)
+#     cursor = conn.cursor()
 
-@app.get("/booked_dates_event_planner", status_code=200)
-def get_booked_dates_event_planner(profile_id: Optional[int] = None):
-    conn = sqlite3.connect('event_management.db', timeout=10)
-    cursor = conn.cursor()
+#     try:
 
-    try:
+#         sql_query = """
+#             SELECT e.start_date, e.end_date
+#             FROM Events e
+#             JOIN Profile p ON e.profile_id = p.profile_id
+#             JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
+#             WHERE pt.profile_type = 'event organizer'
+#               AND e.payment_status = 'Payment Transferred'
+#         """
+#         params = ()
 
-        sql_query = """
-            SELECT e.start_date, e.end_date
-            FROM Events e
-            JOIN Profile p ON e.profile_id = p.profile_id
-            JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
-            WHERE pt.profile_type = 'event organizer'
-              AND e.payment_status = 'Payment Transferred'
-        """
-        params = ()
+#         # If profile_id is provided (optional)
+#         if profile_id:
+#             sql_query += " AND e.profile_id = ?"
+#             params = (profile_id,)
 
-        # If profile_id is provided (optional)
-        if profile_id:
-            sql_query += " AND e.profile_id = ?"
-            params = (profile_id,)
+#         cursor.execute(sql_query, params)
+#         results = cursor.fetchall()
 
-        cursor.execute(sql_query, params)
-        results = cursor.fetchall()
+#         booked_dates = set()
 
-        booked_dates = set()
+#         # Expand each event by  start_date to end_date
+#         for start_str, end_str in results:
+#             start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+#             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
 
-        # Expand each event by  start_date to end_date
-        for start_str, end_str in results:
-            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+#             current_date = start_date
+#             while current_date <= end_date:
+#                 booked_dates.add(current_date.strftime("%Y-%m-%d"))
+#                 current_date += timedelta(days=1)
 
-            current_date = start_date
-            while current_date <= end_date:
-                booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                current_date += timedelta(days=1)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         conn.close()
 
-    finally:
-        conn.close()
-
-    return {"disabled_dates": sorted(list(booked_dates))}
+#     return {"disabled_dates": sorted(list(booked_dates))}
 
 
 
