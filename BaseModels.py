@@ -77,7 +77,7 @@ class Events(BaseModel):
     user_id: int
     profile_id: int
     location: str
-    booking_status: str = "confirmed" 
+    booking_status: str
 
 class Payments(BaseModel):
  #   payment_id:int 
