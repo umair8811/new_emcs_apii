@@ -1208,16 +1208,6 @@ def Get_event_by_Event_Organisers():
 
 
 
-from fastapi import FastAPI, HTTPException
-from typing import Optional
-from datetime import datetime, timedelta
-import sqlite3
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI()
 
 @app.get("/booked_dates_event_planner", status_code=200)
 def get_booked_dates_event_planner(profile_id: Optional[int] = None):
@@ -1225,53 +1215,44 @@ def get_booked_dates_event_planner(profile_id: Optional[int] = None):
     cursor = conn.cursor()
 
     try:
+        # Base SQL with JOIN to make sure profile is an event organizer
         sql_query = """
             SELECT e.start_date, e.end_date
             FROM Events e
             JOIN Profile p ON e.profile_id = p.profile_id
             JOIN Profile_Type pt ON p.profile_type_id = pt.profile_type_id
             WHERE pt.profile_type = 'event organizer'
+              AND e.payment_status = 'Pending'
         """
 
         params = ()
+
+        # If profile_id is provided (optional), filter more
         if profile_id:
             sql_query += " AND e.profile_id = ?"
             params = (profile_id,)
 
-        logger.info(f"Executing query: {sql_query} with params: {params}")
         cursor.execute(sql_query, params)
         results = cursor.fetchall()
-        logger.info(f"Query results: {results}")
 
         booked_dates = set()
 
+        # Expand each event from start_date to end_date
         for start_str, end_str in results:
-            try:
-                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-                logger.info(f"Processing event from {start_str} to {end_str}")
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
 
-                current_date = start_date
-                while current_date <= end_date:
-                    booked_dates.add(current_date.strftime("%Y-%m-%d"))
-                    current_date += timedelta(days=1)
-            except ValueError as ve:
-                logger.error(f"Invalid date format for {start_str} or {end_str}: {ve}")
-                continue
-
-        logger.info(f"Booked dates: {booked_dates}")
-        return {"disabled_dates": sorted(list(booked_dates))}
-
+            current_date = start_date
+            while current_date <= end_date:
+                booked_dates.add(current_date.strftime("%Y-%m-%d"))
+                current_date += timedelta(days=1)
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         conn.close()
 
-
-
-
+    return {"disabled_dates": sorted(list(booked_dates))}
 
 
 
