@@ -6,13 +6,7 @@ import json
 from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from fastapi import FastAPI, UploadFile, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from typing import Optional
-import shutil
-import os
 
 #API instance
 app = FastAPI()
@@ -1470,7 +1464,6 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
         2: "Venue Provider"
     }
 
-    # If profile_number is 1 or 2, get specific profile types that are active
     if profile_number in profile_type_map:
         profile_type = profile_type_map[profile_number]
         cursor.execute('''
@@ -1504,7 +1497,7 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
             "experience": row[3],
             "thumbnail_image": row[4],
             "profile_type": row[5],
-            "user_id": row[6]  # Include user_id in the response
+            "user_id": row[6]  
         }
         for row in cursor.fetchall()
     ]
@@ -1512,40 +1505,6 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
     conn.close()
 
     return {"profiles": profiles}
-
-
-
-
-
-# Allow Flutter frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Store images in /uploads
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-@app.post("/manual_payment/")
-async def manual_payment(
-    user_id: int = Form(...),
-    event_id: int = Form(...),
-    amount: str = Form(...),
-    screenshot: UploadFile = Form(...)
-):
-    filename = f"{user_id}_{event_id}_{screenshot.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(screenshot.file, buffer)
-
-    # Here you can insert the payment record in a database
-    print(f"Received payment of {amount} PKR from user {user_id} for event {event_id}")
-    return JSONResponse({"status": "success", "message": "Payment received"})
-
 
 
 
