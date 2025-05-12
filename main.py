@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from BaseModels import ChatMessage
+from dotenv import load_dotenv
 
 
 #API instance
