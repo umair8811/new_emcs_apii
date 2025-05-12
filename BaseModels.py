@@ -111,4 +111,5 @@ class SelectBidRequest(BaseModel):
     event_type: str
 
 class ChatMessage(BaseModel):
-    message: str
+    role: str
+    text: str

@@ -7,7 +7,6 @@ from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from BaseModels import ChatMessage
 from utils.groq_client import get_groq_response
