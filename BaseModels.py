@@ -109,7 +109,3 @@ class SelectBidRequest(BaseModel):
     event_id: int
     bid_id: int
     event_type: str
-
-class ChatMessage(BaseModel):
-    role: str
-    text: str
