@@ -1507,22 +1507,22 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
 
 
 
-import os
-from groq import Groq
+url = "https://api.groq.com/openai/v1/chat/completions"
+headers = {
+    "Authorization": "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",
+    "Content-Type": "application/json"
+}
+payload = {
+    "model": "llama3-70b-8192",
+    "messages": [
+        {"role": "user", "content": "Explain the importance of fast language models"}
+    ]
+}
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+response = requests.post(url, headers=headers, json=payload)
+print(response.json()["choices"][0]["message"]["content"])
 
-chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "user",
-            "content": "Explain the importance of fast language models",
-        }
-    ],
-    model="llama-3.3-70b-versatile",
-)
 
-print(chat_completion.choices[0].message.content)
 
 
 if __name__ == "__main__":
