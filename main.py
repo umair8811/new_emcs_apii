@@ -60,28 +60,21 @@ def Create_user_type(user_type: User_Type):
 
         # Insert data into User_Type table
         cursor.execute("INSERT INTO User_Type (user_type) VALUES (?)", (user_type.user_type,))
-        
-        # Commit the transaction
         conn.commit()
 
-        # Fetch all records from User_Type table
         cursor.execute("SELECT * FROM User_Type")
         res = cursor.fetchall()
 
-        # Prepare the result as a dictionary list
         keys = ['user_type_id', 'user_type']
         user_type_dict_list = [dict(zip(keys, item)) for item in res]
 
     except sqlite3.OperationalError as e:
-        # Handle database locking errors or other issues
         return {"error": f"Database operation failed: {e}"}
 
     except Exception as e:
-        # Catch any other exceptions
         return {"error": f"An unexpected error occurred: {e}"}
 
     finally:
-        # Ensure the connection is closed
         if conn:
             conn.close()
 
@@ -1464,6 +1457,7 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
         2: "Venue Provider"
     }
 
+    # If profile_number is 1 or 2, get specific profile types that are active
     if profile_number in profile_type_map:
         profile_type = profile_type_map[profile_number]
         cursor.execute('''
@@ -1497,7 +1491,7 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
             "experience": row[3],
             "thumbnail_image": row[4],
             "profile_type": row[5],
-            "user_id": row[6]  
+            "user_id": row[6]  # Include user_id in the response
         }
         for row in cursor.fetchall()
     ]
@@ -1505,6 +1499,32 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
     conn.close()
 
     return {"profiles": profiles}
+
+
+
+
+
+
+
+app = FastAPI()
+client = Groq()
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    messages = [{"role": "user", "content": request.message}]
+    response = client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        messages=messages,
+        temperature=1,
+        max_completion_tokens=1024,
+        top_p=1,
+        stream=False,
+    )
+    reply = response.choices[0].message.content
+    return {"response": reply}
 
 
 
