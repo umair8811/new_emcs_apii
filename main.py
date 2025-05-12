@@ -7,7 +7,11 @@ from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
-import requests
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from models import ChatMessage
+from utils.groq_client import get_groq_response
+from dotenv import load_dotenv
 
 #API instance
 app = FastAPI()
@@ -1504,26 +1508,22 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
 
 
 
+load_dotenv()
 
+app = FastAPI()
 
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-
-url = "https://api.groq.com/openai/v1/chat/completions"
-headers = {
-    "Authorization": "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",
-    "Content-Type": "application/json"
-}
-payload = {
-    "model": "llama3-70b-8192",
-    "messages": [
-        {"role": "user", "content": "Explain the importance of fast language models"}
-    ]
-}
-
-response = requests.post(url, headers=headers, json=payload)
-print(response.json()["choices"][0]["message"]["content"])
-
-
+@app.post("/chat")
+async def chat_with_bot(chat: ChatMessage):
+    response = get_groq_response(chat.message)
+    return {"response": response}
 
 
 if __name__ == "__main__":
