@@ -7,6 +7,8 @@ from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
+import os
+from groq import Groq
 
 #API instance
 app = FastAPI()
@@ -1506,23 +1508,23 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
 
 
 
-class ChatRequest(BaseModel):
-    message: str
 
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    messages = [{"role": "user", "content": request.message}]
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=messages,
-        temperature=1,
-        max_completion_tokens=1024,
-        top_p=1,
-        stream=False,
-    )
-    reply = response.choices[0].message.content
-    return {"response": reply}
 
+client = Groq(
+    api_key=os.environ.get("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"),
+)
+
+chat_completion = client.chat.completions.create(
+    messages=[
+        {
+            "role": "user",
+            "content": "Explain the importance of fast language models",
+        }
+    ],
+    model="llama-3.3-70b-versatile",
+)
+
+print(chat_completion.choices[0].message.content)
 
 
 if __name__ == "__main__":
