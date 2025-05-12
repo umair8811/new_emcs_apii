@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from BaseModels import ChatMessage
-from utils.groq_client import get_groq_response
-from dotenv import load_dotenv
 
 
 #API instance
