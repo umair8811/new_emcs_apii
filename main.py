@@ -7,6 +7,7 @@ from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
+import requests
 
 #API instance
 app = FastAPI()
