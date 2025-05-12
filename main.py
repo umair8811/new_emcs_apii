@@ -7,8 +7,6 @@ from fastapi import status,FastAPI,HTTPException,Depends,Query
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Optional
-import os
-from groq import Groq
 
 #API instance
 app = FastAPI()
@@ -1509,10 +1507,10 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
 
 
 
+import os
+from groq import Groq
 
-client = Groq(
-    api_key=os.environ.get("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"),
-)
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 chat_completion = client.chat.completions.create(
     messages=[
