@@ -1506,9 +1506,6 @@ def get_profiles(profile_number: int = Query(..., description="Profile number (1
 
 
 
-app = FastAPI()
-client = Groq()
-
 class ChatRequest(BaseModel):
     message: str
 
