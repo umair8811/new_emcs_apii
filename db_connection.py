@@ -1,6 +1,6 @@
 import sqlite3
 
-# ---DATABASE CONNECTION-----
+# ---DATABASE CONNECTION--------
 try:
     conn = sqlite3.connect('event_management.db')  # The database file name
     conn.execute('PRAGMA foreign_keys = ON;')
